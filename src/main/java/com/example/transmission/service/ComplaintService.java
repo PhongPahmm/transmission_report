@@ -1,22 +1,18 @@
 package com.example.transmission.service;
-
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import com.aspose.cells.*;
 import com.example.transmission.domain.Complaint;
-import com.example.transmission.repository.ComplaintRepository;
 import com.example.transmission.dto.ColumnMapping;
 import com.example.transmission.dto.Sheet5Mapping;
 import com.example.transmission.dto.Sheet6Mapping;
-import org.apache.poi.ss.usermodel.*;
+import com.example.transmission.repository.ComplaintRepository;
 import org.apache.poi.ss.util.CellReference;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.apache.poi.ss.usermodel.CellType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -31,215 +27,180 @@ public class ComplaintService {
     @Autowired
     private ComplaintRepository complaintRepository;
 
-    private static final String EXCEL_FILE_PATH = "src/main/resources/templates/(File_chạy)BAOCAOKENHTRUYENNGAY31.07.2025_New.xlsx";
+    private static final String EXCEL_FILE_PATH =
+            "src/main/resources/templates/(File_chạy)BAOCAOKENHTRUYENNGAY31.07.2025_New.xlsx";
 
-    /**
-     * Format LocalDate thành dd/MM/yyyy
-     */
-    public static Object formatLocalDate(Object value) {
-        if (value instanceof LocalDate) {
-            LocalDate date = (LocalDate) value;
-            return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-        }
-        return value;
-    }
+    /** * Format LocalDate thành dd/MM/yyyy */ public static Object formatLocalDate(Object value) { if (value instanceof LocalDate) { LocalDate date = (LocalDate) value; return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")); } return value; } /** * Format LocalTime thành HH:mm:ss */ public static Object formatLocalTime(Object value) { if (value instanceof LocalTime ) { LocalTime time = (LocalTime) value; return time.format(DateTimeFormatter.ofPattern("HH:mm:ss")); } return value; } /** * Format LocalDateTime thành dd/MM/yyyy HH:mm:ss */ public static Object formatLocalDateTime(Object value) { if (value instanceof LocalDateTime) { LocalDateTime dateTime = (LocalDateTime) value; return dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")); } return value; }
 
-    /**
-     * Format LocalTime thành HH:mm:ss
-     */
-    public static Object formatLocalTime(Object value) {
-        if (value instanceof LocalTime ) {
-            LocalTime time = (LocalTime) value;
-
-            return time.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-        }
-        return value;
-    }
-
-    /**
-     * Format LocalDateTime thành dd/MM/yyyy HH:mm:ss
-     */
-    public static Object formatLocalDateTime(Object value) {
-        if (value instanceof LocalDateTime) {
-            LocalDateTime dateTime = (LocalDateTime) value;
-
-            return dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-        }
-        return value;
-    }
-
+    // ==== Export Excel bằng Aspose hoàn toàn ====
     public byte[] exportExcelFile() {
         try (FileInputStream fis = new FileInputStream(EXCEL_FILE_PATH);
-             XSSFWorkbook workbook = new XSSFWorkbook(fis);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+
+            Workbook wb = new Workbook(fis);
 
             List<Complaint> complaints = complaintRepository.findAll();
-            
             if (complaints.isEmpty()) {
                 logger.warn("No complaints found in database");
             } else {
                 logger.info("Found {} complaints to export", complaints.size());
             }
 
-            insertDataToSheet5(workbook, complaints);
-            insertDataToSheet6(workbook, complaints);
+            insertDataToSheet5(wb, complaints);
+            insertDataToSheet6(wb, complaints);
 
-            // Xuất ra file Excel
-            workbook.write(outputStream);
-            outputStream.flush();
+            // Tính lại công thức
+            wb.calculateFormula();
 
-            return outputStream.toByteArray();
+            wb.save(out, SaveFormat.XLSX);
+            return out.toByteArray();
 
-        } catch (IOException e) {
-            logger.error("Error reading Excel template file: {}", EXCEL_FILE_PATH, e);
-            throw new RuntimeException("Lỗi khi export Excel", e);
         } catch (Exception e) {
-            logger.error("Unexpected error during Excel export", e);
-            throw new RuntimeException("Lỗi không mong muốn khi export Excel", e);
+            logger.error("❌ Error during Aspose export", e);
+            throw new RuntimeException("Lỗi khi export Excel", e);
         }
     }
-    /**
-     * Insert dữ liệu vào Sheet 5 (Chi_tiet_chung)
-     */
-    private void insertDataToSheet5(Workbook workbook, List<Complaint> complaints) {
-        Sheet sheet = workbook.getSheet("Chi_tiet_chung");
+
+    // ==== Insert data vào Sheet 5 ====
+    private void insertDataToSheet5(Workbook wb, List<Complaint> complaints) {
+        Worksheet sheet = wb.getWorksheets().get("Chi_tiet_chung");
         if (sheet == null) {
             logger.error("Không tìm thấy Sheet 'Chi_tiet_chung'");
             return;
         }
-
-        int startRow = 4; // Row 5 (index 4)
-
-        insertDataToSheet(sheet, complaints, startRow, Sheet5Mapping.MAPPINGS, "Sheet 5");
+        insertDataToSheet(sheet, complaints, 4, Sheet5Mapping.MAPPINGS, "Sheet 5");
     }
 
-    /**
-     * Insert dữ liệu vào Sheet 6 (ON)
-     */
-    private void insertDataToSheet6(Workbook workbook, List<Complaint> complaints) {
-        Sheet sheet = workbook.getSheet("ON");
+    // ==== Insert data vào Sheet 6 ====
+    private void insertDataToSheet6(Workbook wb, List<Complaint> complaints) {
+        Worksheet sheet = wb.getWorksheets().get("ON");
         if (sheet == null) {
             logger.error("Không tìm thấy Sheet 'ON'");
             return;
         }
-
-        int startRow = 2; // Row 3 (index 2)
-
-        insertDataToSheet(sheet, complaints, startRow, Sheet6Mapping.MAPPINGS, "Sheet 6");
+        insertDataToSheet(sheet, complaints, 2, Sheet6Mapping.MAPPINGS, "Sheet 6");
     }
 
-    /**
-     * Generic method để insert data vào sheet
-     * CHỈ insert vào những cột được mapping, KHÔNG ảnh hưởng đến các cột khác
-     */
-    private void insertDataToSheet(Sheet sheet, List<Complaint> complaints, int startRow, 
-                                 ColumnMapping[] mappings, String sheetName) {
-        
+    // ==== Generic insert ====
+    private void insertDataToSheet(Worksheet sheet, List<Complaint> complaints,
+                                   int startRow, ColumnMapping[] mappings, String sheetName) {
         if (complaints == null || complaints.isEmpty()) {
             logger.warn("No complaints to insert into {}", sheetName);
             return;
         }
-        
+
+        Cells cells = sheet.getCells();
+
         for (int i = 0; i < complaints.size(); i++) {
             Complaint complaint = complaints.get(i);
-            
-            if (complaint == null) {
-                logger.warn("Skipping null complaint at index {}", i);
-                continue;
-            }
-            
-            Row row = sheet.getRow(startRow + i);
-            
-            // Nếu row chưa tồn tại, tạo row mới để giữ nguyên các cột khác
-            if (row == null) {
-                row = sheet.createRow(startRow + i);
-                logger.debug("Tạo row mới tại index {}", startRow + i);
-            }
+            if (complaint == null) continue;
 
-            // CHỈ insert vào những cột được mapping cụ thể
             for (ColumnMapping mapping : mappings) {
                 try {
                     int colIndex = CellReference.convertColStringToIndex(mapping.getColumnLetter());
-                    
-                    // Lấy cell hiện tại (có thể chứa công thức)
-                    Cell cell = row.getCell(colIndex);
-                    
-                    // Nếu cell chưa tồn tại, tạo cell mới
-                    if (cell == null) {
-                        cell = row.createCell(colIndex);
-                        logger.debug("Tạo cell mới tại cột {} (index {})", mapping.getColumnLetter(), colIndex);
-                    } else {
-                        // Nếu cell đã tồn tại, kiểm tra xem có chứa công thức không
-                        if (cell.getCellType() == CellType.FORMULA) {
-                            logger.warn("Cột {} tại row {} chứa công thức, sẽ bị ghi đè bởi data", 
-                                      mapping.getColumnLetter(), startRow + i + 1);
-                        }
-                    }
 
-                    // Lấy giá trị từ domain object
                     Object value = mapping.getGetter().apply(complaint);
-                    
-                    // Áp dụng formatter nếu có
                     if (mapping.getFormatter() != null) {
                         value = mapping.getFormatter().apply(value);
                     }
-                    
-                    // Set giá trị vào cell
-                    setCellValue(cell, value);
+
+                    Cell cell = cells.get(startRow + i, colIndex);
+                    putCellValue(cell, value);
+
                 } catch (Exception e) {
-                    logger.error("Error processing column {} for complaint at index {}", 
-                               mapping.getColumnLetter(), i, e);
+                    logger.error("❌ Error processing column {} at row {}",
+                            mapping.getColumnLetter(), startRow + i + 1, e);
                 }
             }
         }
-
-        forceExcelCalculation(sheet, startRow, complaints.size());
-
-        logger.info("Đã insert {} complaints vào {} với {} cột mapping", 
-                   complaints.size(), sheetName, mappings.length);
+        logger.info("✔ Đã insert {} complaints vào {} ({} cột mapping)",
+                complaints.size(), sheetName, mappings.length);
     }
-    
-    /**
-     * Set giá trị cho cell với kiểu dữ liệu phù hợp
-     */
-    private void setCellValue(Cell cell, Object value) {
-        try {
-            if (value == null) {
-                cell.setCellValue("");
-            } else if (value instanceof String) {
-                String strValue = (String) value;
-                cell.setCellValue(strValue);
-            } else if (value instanceof Number) {
-                Number numValue = (Number) value;
-                cell.setCellValue(numValue.doubleValue());
-            } else if (value instanceof Boolean) {
-                Boolean boolValue = (Boolean) value;
-                cell.setCellValue(boolValue);
-            } else {
-                cell.setCellValue(value.toString());
-            }
-        } catch (Exception e) {
-            logger.warn("Error setting cell value: {}", value, e);
-            cell.setCellValue("");
+
+    // ==== Set giá trị cell ====
+    private void putCellValue(Cell cell, Object value) {
+        if (value == null) {
+            cell.putValue("");
+        } else {
+            cell.putValue(value);
         }
     }
 
+    // ==== Copy block từ transmission_updated sang final template (dùng Apache POI, chỉ copy VALUE) ====
+    public byte[] copyBlockFromUpdatedToFinal(byte[] updatedBytes) {
+        String finalTemplatePath =
+                "src/main/resources/templates/(File_phụ_lục_cuối_cùng)_Kênh_Truyen_PL_tinh_hinh_tiep_nhan_va_xu_ly_ngay_31.07.xlsx";
 
-    private void forceExcelCalculation(Sheet sheet, int startRow, int rowCount) {
-        try {
-            // Force workbook calculation
-            Workbook workbook = sheet.getWorkbook();
-            if (workbook instanceof XSSFWorkbook ) {
+        try (ByteArrayInputStream bisUpdated = new ByteArrayInputStream(updatedBytes);
+             FileInputStream fisFinal = new FileInputStream(finalTemplatePath);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream();
+             org.apache.poi.ss.usermodel.Workbook updatedWb = new XSSFWorkbook(bisUpdated);
+             org.apache.poi.ss.usermodel.Workbook finalWb = new XSSFWorkbook(fisFinal)) {
 
-                XSSFWorkbook xssfWorkbook = (XSSFWorkbook) workbook;
-                // Trigger calculation bằng cách set calculation mode
-                xssfWorkbook.setForceFormulaRecalculation(true);
+            org.apache.poi.ss.usermodel.Sheet srcSheet = updatedWb.getSheet("Phu_luc_BC_ngay");
+            org.apache.poi.ss.usermodel.Sheet destSheet = finalWb.getSheet("PL06_Kenh_truyen");
+
+            if (srcSheet == null || destSheet == null) {
+                logger.error("❌ Không tìm thấy sheet nguồn hoặc đích");
+                return new byte[0];
             }
 
+            // D16:L20 (row 15–19, col 3–11) → C7:K11 (row 6–10, col 2–10)
+            for (int r = 0; r <= 4; r++) {
+                org.apache.poi.ss.usermodel.Row srcRow = srcSheet.getRow(15 + r);
+                org.apache.poi.ss.usermodel.Row destRow = destSheet.getRow(6 + r);
+                if (srcRow == null) continue;
+                if (destRow == null) destRow = destSheet.createRow(6 + r);
+
+                for (int c = 0; c <= 8; c++) {
+                    org.apache.poi.ss.usermodel.Cell srcCell = srcRow.getCell(3 + c);
+                    org.apache.poi.ss.usermodel.Cell destCell = destRow.getCell(2 + c);
+                    if (destCell == null) destCell = destRow.createCell(2 + c);
+
+                    if (srcCell != null) {
+                        switch (srcCell.getCellType()) {
+                            case STRING:
+                                destCell.setCellValue(srcCell.getStringCellValue());
+                                break;
+                            case NUMERIC:
+                                destCell.setCellValue(srcCell.getNumericCellValue());
+                                break;
+                            case BOOLEAN:
+                                destCell.setCellValue(srcCell.getBooleanCellValue());
+                                break;
+                            case BLANK:
+                                destCell.setBlank();
+                                break;
+                            case FORMULA:
+                                // chỉ lấy giá trị tính toán của công thức
+                                try {
+                                    destCell.setCellValue(srcCell.getNumericCellValue());
+                                } catch (Exception e) {
+                                    try {
+                                        destCell.setCellValue(srcCell.getStringCellValue());
+                                    } catch (Exception ex) {
+                                        destCell.setCellValue(srcCell.toString());
+                                    }
+                                }
+                                break;
+                            default:
+                                destCell.setCellValue(srcCell.toString());
+                        }
+                    } else {
+                        destCell.setBlank();
+                    }
+                }
+            }
+
+            finalWb.write(bos);
+            return bos.toByteArray();
+
         } catch (Exception e) {
-            logger.error("Lỗi khi force calculation: {}", e.getMessage(), e);
+            logger.error("❌ Error khi copy block value bằng Apache POI", e);
+            return new byte[0];
         }
     }
+
 
 
 }

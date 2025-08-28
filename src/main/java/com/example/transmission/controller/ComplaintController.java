@@ -16,23 +16,33 @@ public class ComplaintController {
     @Autowired
     private ComplaintService complaintService;
 
+    // API 1: Tạo transmission_updated.xlsx
+    @GetMapping("/transmission-updated")
+    public ResponseEntity<byte[]> downloadTransmissionUpdated() {
+        byte[] fileBytes = complaintService.exportExcelFile()
+                ;
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=transmission_updated.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(fileBytes);
+    }
 
-    @GetMapping("excel")
-    public ResponseEntity<byte[]> exportExcelFile() {
-        try {
-            byte[] updatedFile = complaintService.exportExcelFile();
+    // API 2: Tạo final template dựa trên transmission_updated
+    @GetMapping("/final-template")
+    public ResponseEntity<byte[]> downloadFinalTemplate() {
+        // Gọi service: copy block từ transmission_updated.xlsx sang final template
+        byte[] transmissionBytes = complaintService.exportExcelFile();
 
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=transmission_updated.xlsx")
-                    .contentType(MediaType.parseMediaType(
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                    .body(updatedFile);
+        byte[] finalBytes = complaintService.copyBlockFromUpdatedToFinal(transmissionBytes);
 
-        } catch (Exception e) {
-           throw new RuntimeException(e);
-
-        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=final_kenh_truyen.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(finalBytes);
     }
 
 }
